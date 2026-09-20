@@ -1,10 +1,37 @@
 import { NextResponse } from "next/server";
 
-const normalize = (value: string) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+const STOP_WORDS = new Set(["a", "an", "the", "wwe", "and", "at", "by", "of", "vs"]);
+const normalize = (value: string) => value
+  .toLowerCase()
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/&/g, " and ")
+  .replace(/[^a-z0-9]+/g, " ")
+  .trim();
+
+const usefulTokens = (value: string) => normalize(value).split(" ").filter((token) => token && !STOP_WORDS.has(token));
+
+function editDistance(a: string, b: string) {
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= a.length; row += 1) {
+    let diagonal = previous[0];
+    previous[0] = row;
+    for (let column = 1; column <= b.length; column += 1) {
+      const above = previous[column];
+      previous[column] = Math.min(
+        previous[column] + 1,
+        previous[column - 1] + 1,
+        diagonal + (a[row - 1] === b[column - 1] ? 0 : 1),
+      );
+      diagonal = above;
+    }
+  }
+  return previous[b.length];
+}
 
 function similarity(a: string, b: string) {
-  const left = new Set(normalize(a).split(" ").filter(Boolean));
-  const right = new Set(normalize(b).split(" ").filter(Boolean));
+  const left = new Set(usefulTokens(a));
+  const right = new Set(usefulTokens(b));
   const matches = Array.from(left).filter((word) => right.has(word)).length;
   return matches / Math.max(left.size, right.size, 1);
 }
@@ -17,7 +44,11 @@ export async function POST(request: Request) {
 
   const normalizedUser = normalize(userAnswer);
   const normalizedCanonical = normalize(canonicalAnswer);
-  if (normalizedUser === normalizedCanonical || normalizedCanonical.includes(normalizedUser) || similarity(userAnswer, canonicalAnswer) >= 0.66) {
+  const characterScore = 1 - editDistance(normalizedUser, normalizedCanonical) / Math.max(normalizedUser.length, normalizedCanonical.length, 1);
+  const userTokens = usefulTokens(userAnswer);
+  const canonicalTokens = usefulTokens(canonicalAnswer);
+  const meaningfulPartial = userTokens.length > 0 && canonicalTokens.length <= 2 && userTokens.some((token) => token.length >= 4 && canonicalTokens.includes(token));
+  if (normalizedUser === normalizedCanonical || characterScore >= 0.82 || similarity(userAnswer, canonicalAnswer) >= 0.72 || meaningfulPartial) {
     return NextResponse.json({ correct: true, gradedBy: "local" });
   }
 

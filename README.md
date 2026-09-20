@@ -1,6 +1,8 @@
 # WWE Era Trivia (2009–2018)
 
-A lean, mobile-first WWE trivia game built with Next.js 14, TypeScript and Tailwind CSS. Multiple-choice play is fully local and requires no API calls. Free-text grading uses deterministic local matching first and can optionally fall back to Hugging Face.
+A lean, mobile-first WWE trivia game built with Next.js 14, TypeScript and Tailwind CSS. Each round automatically mixes 80% five-option multiple choice with 20% forgiving free-text prompts. Local grading handles punctuation, missing filler words, partial names and minor typos before optionally falling back to Hugging Face.
+
+Five-option questions follow a deliberate arcade pattern: the authored distractors provide close alternatives, while the final option is drawn from the nearest available level/domain pool. This avoids runtime AI calls and keeps every round fast and free.
 
 ## Run locally
 
